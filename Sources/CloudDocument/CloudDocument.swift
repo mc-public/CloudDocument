@@ -137,6 +137,15 @@ class CloudDocument<FilePresenter>: UIDocument where FilePresenter: CloudFilePre
         }
     }
     
+    /// Load document data asynchronously.
+    @MainActor
+    func load(_ completionHandler: ((Error?) -> ())? = nil) {
+        Task {
+            do { try await self.load() }
+            catch { completionHandler?(error) }
+        }
+    }
+    
 //MARK: - UIDocument Override
     
     /// Reads the document data in a file at a specified location in the application sandbox.

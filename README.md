@@ -36,7 +36,7 @@ extension String: CloudFilePresenter {
     }
 }
 ```
-It is important to note that types conforming to this protocol must be value types, otherwise it will lead to unexpected behavior.
+It is important to note that types conforming to this protocol must be valuable semantics. Otherwise it will lead to unexpected behavior.
 
 ### Load File Model and Use in SwiftUI
 

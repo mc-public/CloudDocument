@@ -11,12 +11,13 @@ import UIKit
 import SwiftUI
 
 
-
+/// The state management delegate protocol of `CloudFileModel`.
 @available(iOS 13.0, *)
 public protocol CloudFileModelDelegate: AnyObject {
     /// The method called when the state of the model may been updated from one state to another.
     ///
     /// This function is called at main queue or `MainActor`.
+    @MainActor
     func modelStateDidChanged()
 }
 
@@ -37,13 +38,18 @@ public protocol CloudFilePresenter: Sendable {
     func getPresentedData() throws -> Data
 }
 
+/// Document class for managing iCloud files and coordinating file access.
+///
+/// This model uses `UIDocument` as its internal model, therefore supporting most of the functionalities provided by `UIDocument`. 
+///
+/// - Note: Automatic saving and undo/redo functionality are not available at the moment, you will need to manually call the save method provided by this class at critical moments.
 @available(iOS 13.0, *)
 @MainActor
 public class CloudFileModel<FilePresenter>: ObservableObject where FilePresenter: CloudFilePresenter {
     public typealias Version = ConflictedVersion<FilePresenter>
     typealias Document = CloudDocument<FilePresenter>
     
-    /// Enum for Current Document Status.
+    /// Enum for current document status.
     public enum State: String, Error {
         /// The document status is normal.
         case normal
@@ -76,13 +82,14 @@ public class CloudFileModel<FilePresenter>: ObservableObject where FilePresenter
         }
     }
     /// The state management delegate of current delegate.
-    public var delegate: (any CloudFileModelDelegate)?
+    public weak var delegate: (any CloudFileModelDelegate)?
     
     /// Retrieve the cloud storage version corresponding to the current document.
     ///
     /// If the document has already been deleted, this method will throw an error.
     public var currentVersion: Version {
         get throws {
+            if self.isDeleted { throw CocoaError(.fileNoSuchFile) }
             guard let version = NSFileVersion.currentVersionOfItem(at: self.fileURL) else {
                 throw CocoaError(.fileNoSuchFile)
             }
@@ -127,7 +134,7 @@ public class CloudFileModel<FilePresenter>: ObservableObject where FilePresenter
     /// - Parameter fileURL: The Cloud file `URL` that can be accessed within a secure scope. They are typically derived from `UIDocumentBrowserViewController` or `UIDocumentPickerViewController` or SwiftUI `DocumentGroup` or SwiftUI `.fileImporter`.
     /// - Parameter documentBrowser: If the `URL` corresponding to the first parameter comes from the `UIDocumentBrowserViewController`, you can pass this parameter to achieve document renaming.
     /// - Note: If you want to use file renaming operations with `DocumentGroup` in SwiftUI, you can access the root view controller of the current `Scene` using @`SceneDelegate` and pass that controller into this parameter.
-    @available(iOS 16.0, *)
+    @available(iOS 13.0, *)
     public init(fileURL: URL, documentBrowser: UIDocumentBrowserViewController? = nil) async throws {
         self.documentBrowser = documentBrowser
         self.document = .init(fileURL: fileURL)
@@ -139,37 +146,14 @@ public class CloudFileModel<FilePresenter>: ObservableObject where FilePresenter
     ///
     /// - Parameter fileURL: The Cloud file `URL` that can be accessed within a secure scope. They are typically derived from `UIDocumentBrowserViewController` or `UIDocumentPickerViewController` or SwiftUI `DocumentGroup` or SwiftUI `.fileImporter`.
     /// - Parameter documentBrowser: If the `URL` corresponding to the first parameter comes from the `UIDocumentBrowserViewController`, you can pass this parameter to achieve document renaming.
+    /// - Parameter onCompletion: Closure called when the document is loaded. Any errors that occur will be passed into the parameters of this closure.
     /// - Note: If you want to use file renaming operations with `DocumentGroup` in SwiftUI, you can access the root view controller of the current `Scene` using @`SceneDelegate` and pass that controller into this parameter.
-    @available(iOS 16.0, *)
-    public init(fileURL: URL, documentBrowser: UIDocumentBrowserViewController? = nil) {
+    @available(iOS 13.0, *)
+    public init(fileURL: URL, documentBrowser: UIDocumentBrowserViewController? = nil, onCompletion: ((Error?) -> ())? = nil) {
         self.documentBrowser = documentBrowser
         self.document = .init(fileURL: fileURL)
         self.document.setDocumentModel(for: self)
-        Task {
-            try await self.document.load()
-        }
-    }
-    
-    /// Construct the current model using the specified iCloud file URL.
-    ///
-    /// - Parameter fileURL: The Cloud file `URL` that can be accessed within a secure scope. They are typically derived from `UIDocumentBrowserViewController` or `UIDocumentPickerViewController` or SwiftUI `DocumentGroup` or SwiftUI `.fileImporter`.
-    @available(iOS, obsoleted: 16.0, message: "Please use init(fileURL:documentBrowser).")
-    public init(fileURL: URL) async throws {
-        self.document = .init(fileURL: fileURL)
-        self.document.setDocumentModel(for: self)
-        try await self.document.load()
-    }
-    
-    /// Construct the current model using the specified iCloud file URL.
-    ///
-    /// - Parameter fileURL: The Cloud file `URL` that can be accessed within a secure scope. They are typically derived from `UIDocumentBrowserViewController` or `UIDocumentPickerViewController` or SwiftUI `DocumentGroup` or SwiftUI `.fileImporter`.
-    @available(iOS, obsoleted: 16.0, message: "Please use init(fileURL:documentBrowser).")
-    public init(fileURL: URL) {
-        self.document = .init(fileURL: fileURL)
-        self.document.setDocumentModel(for: self)
-        Task {
-            try await self.document.load()
-        }
+        self.document.load(onCompletion)
     }
     
     /// Rename the actual file name corresponding to the current document.
@@ -243,8 +227,10 @@ public class CloudFileModel<FilePresenter>: ObservableObject where FilePresenter
     
     @MainActor
     func updateUI() {
-        self.delegate?.modelStateDidChanged()
-        self.objectWillChange.send()
+        MainActor.assumeIsolated {
+            self.delegate?.modelStateDidChanged()
+            self.objectWillChange.send()
+        }
     }
 }
 
