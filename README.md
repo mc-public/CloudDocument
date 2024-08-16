@@ -12,28 +12,31 @@ CloudDocument uses `UIDocument` to coordinate access to iCloud documents, provid
 - Simple and powerful API for controlling file saving.
 - Simple and powerful API for handling cloud file conflicts.
 - Renaming of `URL` from `UIDocumentBrowserViewController` in a document-based application on UIKit or SwiftUI in iOS 16.0.
+- A class `CloudTextPresenter` for automatically processing text files and text encoding has been provided.
 
 ## Usage Example
 
 Detailed descriptions of all documents are available in the source code files. Here is a brief overview of how to use it.
 
-### Make Data Structure Conform to `CloudFilePresenter` Protocol
+### Make Data Structure Conform to `CloudFileModel` Protocol
 
-For example, here is an example of making the `String` type conform to the `CloudFilePresenter` protocol.
+For example, here is an example of making the `String` type conform to the `CloudFileModel` protocol.
 ```swift
-extension String: CloudFilePresenter {
-    public static func createEmptyPresenter() -> String {
+extension String: CloudFileModel {
+    public typealias DataInfo = String.Encoding
+    public static func createEmptyModel() -> String {
         .init()
     }
-    public static func createPresenter(from data: Data) throws -> String {
-        String(data: data) ?? .init()
+    public static func createModel(from data: Data) throws -> String {
+        String(data: data, encoding: self.dataInfo!) ?? .init()
     }
-    public func getPresentedData() throws -> Data {
-        guard let data = self.data(using: .fastest) else {
+    public func accessModelData() throws -> Data {
+        guard let data = self.data(using: self.dataInfo!) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
         return data
     }
+     var dataInfo: DataInfo? { .utf8 }
 }
 ```
 It is important to note that types conforming to this protocol must be valuable semantics. Otherwise it will lead to unexpected behavior.
@@ -46,7 +49,7 @@ import SwiftUI
 import UIKit
 
 struct DocumentEditor: View {
-    @StateObject var document: CloudFileModel<String>
+    @StateObject var document: CloudFilePresenter<String>
     var body: some View {
         Text(self.document.content)
     }
@@ -54,7 +57,7 @@ struct DocumentEditor: View {
 
 class DocumentBrowserViewController: UIDocumentBrowserViewController {
     func presentDocument(at url: URL) async throws {
-        let document = try await CloudFileModel<String>(fileURL: url, documentBrowser: self)
+        let document = try await CloudFilePresenter<String>(fileURL: url, documentBrowser: self)
         let hostViewController = UIHostingController(rootView: DocumentEditor(model: document))
         hostViewController.modalPresentationStyle = .fullScreen
         hostViewController.sizingOptions = .preferredContentSize
