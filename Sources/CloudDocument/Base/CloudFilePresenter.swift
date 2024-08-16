@@ -77,16 +77,16 @@ public class CloudFilePresenter<FileModel>: ObservableObject where FileModel: Cl
         self.document.conflictedVersions
     }
     
-    /// The file URL of the current text document.
+    /// The file URL of the current document.
     public var fileURL: URL {
         self.document.fileURL
     }
-    /// The file name of the current text document.
+    /// The file name of the current document.
     public var fileName: String {
         self.document.localizedName
     }
     
-    /// The file content of the current text document.
+    /// The file content of the current document.
     public var content: FileModel {
         self.document.content
     }
@@ -163,7 +163,7 @@ public class CloudFilePresenter<FileModel>: ObservableObject where FileModel: Cl
         }
     }
     
-    /// Save the file with the specified content and encoding.
+    /// Save the file with the specified content.
     ///
     /// This method can only be called when the document is in a `.normal` state. Otherwise, an error will be thrown.
     ///

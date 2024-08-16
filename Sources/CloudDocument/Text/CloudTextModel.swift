@@ -22,7 +22,7 @@ public final class CloudTextModel: CloudFileModel {
     private let firstLoadEncoding: Encoding
     
     /// Construct the current model using the specified string.
-    private init(string: String, encoding: Encoding) {
+    init(string: String, encoding: Encoding) {
         self.string = string
         self.firstLoadEncoding = encoding
     }
